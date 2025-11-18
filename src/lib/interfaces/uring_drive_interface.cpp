@@ -198,6 +198,11 @@ void UringDriveInterface::close_dev(const io_device_ptr& iodev) {
 
 folly::Future< std::error_code > UringDriveInterface::async_write(IODevice* iodev, const char* data, uint32_t size,
                                                                   uint64_t offset, bool part_of_batch) {
+
+    LOGINFO("async_write size {} offset {} batch {} addr-aligned {}/{} offset-aligned {}/{}", size, offset,
+            part_of_batch, reinterpret_cast< uint64_t >(data) % 512 == 0 ? "true" : "false",
+            reinterpret_cast< uint64_t >(data) % 4096 == 0 ? "true" : "false", offset % 512 == 0 ? "true" : "false",
+            offset % 4096 == 0 ? "true" : "false");
     if (!m_new_intfc) {
         std::array< iovec, 1 > iov;
         iov[0].iov_base = (void*)data;
@@ -236,6 +241,14 @@ folly::Future< std::error_code > UringDriveInterface::async_write(IODevice* iode
 
 folly::Future< std::error_code > UringDriveInterface::async_writev(IODevice* iodev, const iovec* iov, int iovcnt,
                                                                    uint32_t size, uint64_t offset, bool part_of_batch) {
+
+    for (size_t i = 0; i < iovcnt; i++) {
+        LOGINFO("async_writev size {} offset {} batch {} addr-aligned {}/{} offset-aligned {}/{}", size, offset,
+                part_of_batch, reinterpret_cast< uint64_t >(iov[i].iov_base) % 512 == 0 ? "true" : "false",
+                reinterpret_cast< uint64_t >(iov[i].iov_base) % 4096 == 0 ? "true" : "false",
+                offset % 512 == 0 ? "true" : "false", offset % 4096 == 0 ? "true" : "false");
+    }
+
     auto iocb = new drive_iocb(this, iodev, DriveOpType::WRITE, size, offset);
     iocb->set_iovs(iov, iovcnt);
     iocb->completion = std::move(folly::Promise< std::error_code >{});
@@ -361,7 +374,14 @@ folly::Future< std::error_code > UringDriveInterface::queue_fsync(IODevice* iode
 
 std::error_code UringDriveInterface::sync_write(IODevice* iodev, const char* data, uint32_t size, uint64_t offset) {
     if (!iomanager.am_i_sync_io_capable() || (t_uring_ch == nullptr) || !t_uring_ch->can_submit()) {
-        return KernelDriveInterface::sync_write(iodev, data, size, offset);
+        auto sync_io_capable = iomanager.am_i_sync_io_capable() ? "true" : "false";
+        auto uring_ch_null = t_uring_ch == nullptr ? "true" : "false";
+        auto can_submit = (t_uring_ch && t_uring_ch->can_submit()) ? "true" : "false";
+        auto start_time = Clock::now();
+        auto ret = KernelDriveInterface::sync_write(iodev, data, size, offset);
+        LOGINFO("sync_write called size {} latency {} sync_io_capable {} uring_ch {} can_submit {}", size,
+                get_elapsed_time_us(start_time), sync_io_capable, uring_ch_null, can_submit);
+        return ret;
     }
 
     if (!m_new_intfc) {
@@ -389,7 +409,10 @@ std::error_code UringDriveInterface::sync_write(IODevice* iodev, const char* dat
 std::error_code UringDriveInterface::sync_writev(IODevice* iodev, const iovec* iov, int iovcnt, uint32_t size,
                                                  uint64_t offset) {
     if (!iomanager.am_i_sync_io_capable() || (t_uring_ch == nullptr) || !t_uring_ch->can_submit()) {
-        return KernelDriveInterface::sync_writev(iodev, iov, iovcnt, size, offset);
+        auto start_time = Clock::now();
+        auto ret = KernelDriveInterface::sync_writev(iodev, iov, iovcnt, size, offset);
+        LOGINFO("sync_writev called size {} latency {}", size, get_elapsed_time_us(start_time));
+        return ret;
     }
 
     auto iocb = new drive_iocb(this, iodev, DriveOpType::WRITE, size, offset);

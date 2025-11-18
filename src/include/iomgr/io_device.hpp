@@ -97,27 +97,32 @@ public:
 
     void observe_metrics(drive_iocb* iocb) {
         if (!m_metrics.get()) { return; }
+        static uint64_t count = 0;
         auto dur = get_elapsed_time_us(iocb->op_start_time);
         switch (iocb->op_type) {
         case DriveOpType::WRITE:
-            HISTOGRAM_OBSERVE(*m_metrics, write_lat, dur);
-            HISTOGRAM_OBSERVE(*m_metrics, write_size, iocb->size);
-            LOGTRACE("write, size {}, lat {}", iocb->size, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, write_lat, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, write_size, iocb->size);
+            // if (count % 10000 == 0)
+            LOGINFO("write, size {}, lat {}", iocb->size, dur);
             break;
         case DriveOpType::READ:
-            HISTOGRAM_OBSERVE(*m_metrics, read_lat, dur);
-            HISTOGRAM_OBSERVE(*m_metrics, read_size, iocb->size);
-            LOGTRACE("read, size {}, lat {}", iocb->size, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, read_lat, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, read_size, iocb->size);
+            // if (count % 10000 == 0)
+            LOGINFO("read, size {}, lat {}", iocb->size, dur);
             break;
         case DriveOpType::FSYNC:
-            HISTOGRAM_OBSERVE(*m_metrics, fsync_lat, dur);
-            HISTOGRAM_OBSERVE(*m_metrics, fsync_size, iocb->size);
-            LOGTRACE("fsync, size {}, lat {}", iocb->size, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, fsync_lat, dur);
+            // HISTOGRAM_OBSERVE(*m_metrics, fsync_size, iocb->size);
+            // if (count % 10000 == 0)
+            LOGINFO("fsync, size {}, lat {}", iocb->size, dur);
             break;
 
         default:
             break;
         }
+        count++;
     }
 
     void decrement_pending(int32_t count = 1) {
